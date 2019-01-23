@@ -4,7 +4,8 @@ import edu.unh.cs.treccar_v2.Data;
 import edu.unh.cs.treccar_v2.read_data.CborFileTypeException;
 import edu.unh.cs.treccar_v2.read_data.CborRuntimeException;
 import edu.unh.cs.treccar_v2.read_data.DeserializeData;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -13,10 +14,15 @@ import org.apache.lucene.store.FSDirectory;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 
 /*
  * User: dietz
@@ -30,7 +36,7 @@ import java.util.Iterator;
 public class TrecCarBuildLuceneIndex {
 
     private static void usage() {
-        System.out.println("Command line parameters: paragraphs paragraphCBOR LuceneINDEX");
+        System.out.println("Command line parameters: paragraphs paragraphCBOR LuceneINDEX stopwordsFILE");
         System.exit(-1);
     }
 
@@ -42,13 +48,17 @@ public class TrecCarBuildLuceneIndex {
 
         String mode = args[0];
         String indexPath = args[2];
+        String stopwordsPath = "";
+        if (args.length > 3) {
+            stopwordsPath = args[3];
+        }
 
         if (mode.equals("paragraphs")) {
             final String paragraphsFile = args[1];
             final FileInputStream fileInputStream2 = new FileInputStream(new File(paragraphsFile));
 
             System.out.println("Creating paragraph index in "+indexPath);
-            final IndexWriter indexWriter = setupIndexWriter(indexPath, "paragraph.lucene");
+            final IndexWriter indexWriter = setupIndexWriter(indexPath, "paragraph.lucene", stopwordsPath);
             final Iterator<Data.Paragraph> paragraphIterator = DeserializeData.iterParagraphs(fileInputStream2);
 
             for (int i=1; paragraphIterator.hasNext(); i++){
@@ -70,7 +80,7 @@ public class TrecCarBuildLuceneIndex {
             final FileInputStream fileInputStream = new FileInputStream(new File(pagesFile));
 
             System.out.println("Creating page index in "+indexPath);
-            final IndexWriter indexWriter = setupIndexWriter(indexPath, "pages.lucene");
+            final IndexWriter indexWriter = setupIndexWriter(indexPath, "pages.lucene", stopwordsPath);
 
             final Iterator<Data.Page> pageIterator = DeserializeData.iterAnnotations(fileInputStream);
 
@@ -211,10 +221,18 @@ public class TrecCarBuildLuceneIndex {
 
     }
     @NotNull
-    private static IndexWriter setupIndexWriter(String indexPath, String typeIndex) throws IOException {
+    private static IndexWriter setupIndexWriter(String indexPath, String typeIndex, String stopwordsPath) throws IOException {
         Path path = FileSystems.getDefault().getPath(indexPath, typeIndex);
         Directory indexDir = FSDirectory.open(path);
-        IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer());
+        IndexWriterConfig config;
+        if (stopwordsPath.isEmpty()) {
+            config = new IndexWriterConfig(new EnglishAnalyzer());
+        } else {
+            List<String> lines = Files.readAllLines(Paths.get(stopwordsPath), StandardCharsets.UTF_8);
+            HashSet<String> stopwords = new HashSet<>(lines);
+            CharArraySet stopWordsSet = new CharArraySet(stopwords, true);
+            config = new IndexWriterConfig(new EnglishAnalyzer(stopWordsSet));
+        }
         return new IndexWriter(indexDir, config);
     }
 }
