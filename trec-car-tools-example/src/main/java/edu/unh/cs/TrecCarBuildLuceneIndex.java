@@ -229,6 +229,11 @@ public class TrecCarBuildLuceneIndex {
             config = new IndexWriterConfig(new EnglishAnalyzer());
         } else {
             List<String> lines = Files.readAllLines(Paths.get(stopwordsPath), StandardCharsets.UTF_8);
+            System.out.println("Using stopword list:");
+            for (String s : lines) {
+                System.out.print(" " + s);
+            }
+            System.out.println();
             HashSet<String> stopwords = new HashSet<>(lines);
             CharArraySet stopWordsSet = new CharArraySet(stopwords, true);
             config = new IndexWriterConfig(new EnglishAnalyzer(stopWordsSet));
